@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>{{ member.username }} Profile Page</h1>
+    <div>
+        <p>
+            가입일: {{ member.date_joined|date:"Y-m-d" }}<br>
+            팔로워 : {{ member.followers.count }}명
+            팔로잉 : {{ member.following.count }}명
+        </p>
+    </div>
+    <hr/>
+
+    <h3>등록 물품: {{ products|length }}개</h3>
+    {% for product in products %}
+        <ul>
+            <li>
+                <a href="{% url 'products:product_detail' product.pk %}">
+                    <p>[{{ forloop.counter }}] {{ product.name }}</p>
+                </a>
+            </li>
+        </ul>
+    {% endfor %}
+    <br/>
+    <hr/>
+
+    <h3>찜한 물품: {{ like_products|length }}개</h3>
+    {% for like_product in like_products %}
+        <ul>
+            <li>
+                <a href="{% url 'products:product_detail' like_product.pk %}">
+                    <p>{{ like_product.name }}</p>
+                </a>
+            </li>
+        </ul>
+    {% endfor %}
+
+    <br/>
+    <hr/>
+    {% if request.user != member %}
+        <div>
+            <form action="{% url 'users:follow' member.pk %}" method="POST">
+                {% csrf_token %}
+                {% if request.user in member.followers.all %}
+                    <button type="submit">Unfollow</button>
+                {% else %}
+                    <button type="submit">Follow</button>
+                {% endif %}
+            </form>
+        </div>
+    {% endif %}
+
+    <a href="{% url 'users:users' %}">유저 목록으로 돌아가기</a>
+{% endblock content %}

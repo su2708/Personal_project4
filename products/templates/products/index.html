@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>Welcome to SpartaMarket!!</h1>
+
+    <nav>
+        <ul>
+            <li><a href="{% url 'products:products' %}">Products</a></li>
+            <li><a href="{% url 'users:users' %}">Users</a></li>
+        </ul>
+    </nav>
+
+{% endblock content %}

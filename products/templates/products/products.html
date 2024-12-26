@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>Products</h1>
+
+    {% if request.user.is_authenticated %}
+        <br/>
+        <a href="{% url 'products:create' %}">
+            <button>Create a New Article</button>
+        </a>
+    {% else %}
+        <br/>
+        <a href="{% url 'accounts:login' %}">
+            <button>Login before Create</button>
+        </a>
+    {% endif %}
+    
+    <hr/>
+    {% for product in products %}
+        <!-- product_detail에 필요한 인자인 product.pk를 같이 넘겨줌 -->
+        <a href="{% url 'products:product_detail' product.pk %}">
+            <p>[ {{ product.pk }} ] {{ product.name }} - {{ product.author }}</p>
+        </a>
+        <form action="{% url 'products:like' product.pk %}" method="POST">
+            {% csrf_token %}
+            <button class="btn btn-link">
+                {% if user in product.like_users.all %}
+                    <i class="fa-solid fa-thumbs-up"></i>
+                {% else %}
+                    <i class="fa-regular fa-thumbs-up"></i>
+                {% endif %}
+            </button>
+        </form>
+        <br/>
+        <hr/>
+    {% endfor %}
+    <a href="{% url 'products:index' %}"><button>Index로 돌아가기</button></a>
+{% endblock content %}
