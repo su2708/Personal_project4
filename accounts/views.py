@@ -1,81 +1,62 @@
-from django.shortcuts import render
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
+from .serializers import SignupSerializer, UserUpdateSerializer, UserProfileSerializer
+from django.contrib.auth import authenticate, logout, get_user_model
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
 
-# Create your views here.
-from django.shortcuts import render, redirect
-from django.contrib.auth import update_session_auth_hash
-from django.contrib.auth import login as auth_login
-from django.contrib.auth import logout as auth_logout
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import (
-    AuthenticationForm,
-    PasswordChangeForm,
-)
-from django.views.decorators.http import require_POST, require_http_methods
-from .forms import CustomUserChangeForm, CustomUserCreationForm
+User = get_user_model()
 
-@require_http_methods(["GET", "POST"])  # GET과 POST가 들어올 때만 login 실행 
-def login(request):
-    if request.method == "POST":
-        form = AuthenticationForm(data=request.POST)
-        if form.is_valid():
-            auth_login(request, form.get_user())  # 실제 로그인 처리를 진행하는 부분 
-            
-            # 로그인 성공하면 가려던 곳(next)으로 가고, 아니면 index로 이동 
-            next_path = request.GET.get("next") or "index"
-            return redirect(next_path)
-    else:
-        form = AuthenticationForm()
-    context = {"form": form}
-    return render(request, "accounts/login.html", context)
-
-@require_POST  # POST 요청이 들어올 때만 logout 함수 실행 
-def logout(request):
-    if request.user.is_authenticated:  # user가 로그인 된 상태일 때 실행 
-        auth_logout(request)  # 실제 로그아웃 처리를 진행하는 부분 
-    return redirect("products:index")
-
-@require_http_methods(["GET", "POST"])
+@api_view(['POST'])
+@authentication_classes([])      # 전역 인증 설정 무시
+@permission_classes([AllowAny])  # 전역 IsAuthenticated 설정 무시
 def signup(request):
-    if request.method == "POST":
-        form = CustomUserCreationForm(request.POST)
-        if form.is_valid():
-            user = form.save()  # 새로운 유저 회원가입 정보 저장 
-            auth_login(request, user)  # 회원가입과 동시에 새 회원 정보로 로그인 
-            return redirect("products:index")
-    else:
-        form = CustomUserCreationForm()
-    context = {"form": form}
-    return render(request, "accounts/signup.html", context)
+    serializer = SignupSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({
+            "message": "회원가입이 성공적으로 완료되었습니다."
+        }, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@require_POST
-def delete(request):
-    if request.user.is_authenticated:
-        request.user.delete()  # 회원 탈퇴 
-        auth_logout(request)  # 세션 지우기 
-    return redirect("products:index")
+@api_view(['POST'])
+@authentication_classes([])      # 전역 인증 설정 무시
+@permission_classes([AllowAny])  # 전역 IsAuthenticated 설정 무시
+def login(request):
+    email = request.POST.get('email')
+    password = request.POST.get('password')
 
-@require_http_methods(["GET", "POST"])
-def update(request):
-    if request.method == "POST":
-        form = CustomUserChangeForm(request.POST, instance=request.user)
-        if form.is_valid():
-            form.save()
-            return redirect("products:index")
+    # 사용자 인증
+    user = authenticate(request, email=email, password=password)
+    if user is not None:
+        # JWT 토큰 생성
+        refresh = RefreshToken.for_user(user)
+        return JsonResponse({
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'message': '로그인 성공'
+        }, status=200)
     else:
-        form = CustomUserChangeForm(instance=request.user)
-    context = {"form": form}
-    return render(request, "accounts/update.html", context)
+        return JsonResponse({'error': '이메일 또는 비밀번호가 올바르지 않습니다.'}, status=400)
 
-@login_required
-@require_http_methods(["GET", "POST"])
-def change_password(request):
-    if request.method == "POST":
-        form = PasswordChangeForm(request.user, request.POST)
-        if form.is_valid():
-            form.save()
-            update_session_auth_hash(request, form.user)
-            return redirect("products:index")
-    else:
-        form = PasswordChangeForm(request.user)
-    context = {"form": form}
-    return render(request, "accounts/change_password.html", context)
+@api_view(['GET', 'PUT', 'PATCH'])
+def profile(request, username):
+    user = request.user  # JWT 인증을 통해 얻은 현재 사용자
+    
+    if request.method == 'GET':
+        serializer = UserProfileSerializer(user, context={'request': request})
+        return Response(serializer.data, status=200)
+    
+    if request.method in ('PUT', 'PATCH') :
+        serializer = UserUpdateSerializer(instance=user, data=request.data, partial=True)  # partial=True로 일부 업데이트 허용
+
+        if serializer.is_valid():
+            serializer.save()  # 수정 내용 저장
+            return Response({
+                "message": "회원정보가 성공적으로 수정되었습니다.",
+                "user": serializer.data
+            }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
