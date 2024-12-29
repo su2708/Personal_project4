@@ -1,77 +1,72 @@
+# articles/views.py
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from django.shortcuts import get_object_or_404
 from .models import Product
-from .forms import ProductForm
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_http_methods, require_POST
+from .serializers import ProductListSerializer, ProductDetailSerializer
+from django.core.cache import cache
 
-# Create your views here.
-def index(request):
-    return render(request, "products/index.html")
 
-def products(request):
-    products = Product.objects.all().order_by("-id")
-    context = {"products": products}
-    return render(request, "products/products.html", context)
+class ProductListCreate(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
-def product_detail(request, pk):
-    product = get_object_or_404(Product, pk=pk)
-    context = {"product": product}
-    return render(request, "products/product_detail.html", context)
+    def get(self, request):
+        """상품 목록 조회"""
+        products = Product.objects.all()
+        serializer = ProductListSerializer(products, many=True)  # 목록용 Serializer 사용
+        return Response(serializer.data)
 
-@login_required
-def create(request):
-    if request.method == "POST":
-        form = ProductForm(request.POST, request.FILES)  # 데이터가 바인딩된(값이 채워진) Form
-        if form.is_valid():  # Form이 유효하다면 데이터를 저장하고 다른 곳으로 redirect
-            product = form.save(commit=False)
-            product.author = request.user
-            product.save()
-            return redirect("products:product_detail", product.pk)
-    # 기존 new 함수 부분
-    else:
-        form = ProductForm()
+    def post(self, request):
+        """상품 등록"""
+        serializer = ProductDetailSerializer(data=request.data)  # 상세 Serializer 사용
+        if serializer.is_valid():
+            serializer.save(author=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    context = {"form": form}
-    return render(request, "products/create.html", context)
 
-@login_required
-@require_http_methods(["GET", "POST"])
-def update(request, pk):
-    product = get_object_or_404(Product, pk=pk)
-    if product.author == request.user:
-        if request.method == "POST":
-            form = ProductForm(request.POST, instance=product)
-            if form.is_valid():
-                product = form.save()
-                return redirect("products:product_detail", product.pk)
-        else:
-            form = ProductForm(instance=product)
-        context = {
-            "form": form,
-            "product": product,
-        }
-        return render(request, "products/update.html", context)
-    else:
-        return redirect("products:products")
-
-@require_POST
-def delete(request, pk):
-    product = get_object_or_404(Product, pk=pk)
-    if request.user.is_authenticated:
-        if product.author == request.user:
-            product = get_object_or_404(Product, pk=pk)
-            product.delete()
-    return redirect("products:products")
-
-@require_POST
-def like(request, pk):
-    if request.user.is_authenticated:
-        product = get_object_or_404(Product, pk=pk)
-        if product.like_users.filter(pk=request.user.pk).exists():
-            product.like_users.remove(request.user)
-        else:
-            product.like_users.add(request.user)
-    else:
-        return redirect("accounts:login")
+class ProductDetail(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
     
-    return redirect("products:products")
+    def get_object(self, productId):
+        return get_object_or_404(Product, pk=productId)
+
+    def get(self, request, productId):
+        """상품 상세 조회"""
+        product = self.get_object(productId)
+        
+        # 로그인한 사용자이고 작성자가 아닌 경우에만 조회수 증가 처리
+        # 24시간 동안 같은 IP에서 같은 게시글 조회 시 조회수가 증가하지 않음
+        if request.user != product.author:
+            # 해당 사용자의 IP와 게시글 ID로 캐시 키를 생성
+            cache_key = f"view_count_{request.META.get('REMOTE_ADDR')}_{productId}"
+            
+            # 캐시에 없는 경우에만 조회수 증가
+            if not cache.get(cache_key):
+                product.view_count += 1
+                product.save()
+                # 캐시 저장 (24시간 유효)
+                cache.set(cache_key, True, 60*60*24)
+        
+        # product.view_count += 1
+        # product.save()
+        
+        serializer = ProductDetailSerializer(product)  # 상세 Serializer 사용
+        return Response(serializer.data)
+    
+    def put(self, request, productId):
+        """상품 수정"""
+        product = self.get_object(productId)
+        serializer = ProductDetailSerializer(product)
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
+            return Response(serializer.data)
+    
+    def delete(self, request, productId):
+        """상품 삭제"""
+        product = self.get_object(productId)
+        product.delete()
+        data = {"pk": f"{productId} is deleted."}
+        return Response(data, status=status.HTTP_200_OK)
