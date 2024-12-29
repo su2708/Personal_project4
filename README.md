@@ -1,4 +1,4 @@
-# 스파르타 마켓 이번엔, DRF로 구현해봅시다 🔥
+# DRF로 스파르타 마켓 구현해보기기🔥
 
 ## 1. Goal
 ### 💡주제
@@ -74,21 +74,52 @@
     - **검증**: 요청자가 게시글의 작성자와 일치하는지 확인.
     - **구현**: 해당 상품을 데이터베이스에서 삭제.
     
-<br/>
-
-### 개발 문서
-- ERD 작성
-    - 개발 전 ERD 작성하는 것을 권장
-    - 작성하는 Tool은 무엇이든 괜찮습니다.
-        - 손그림 / Figjam / etc …
-        - 깔끔한 작성보다 작성하는 내용에 집중합시다.
-    - 지난 기본 과제에서 사용했던 ERD 를 수정/보완해서 사용해보세요.
-
-- README 작성
-    - 프로젝트 개요 및 구현하는 기능에 대해 README를 작성해 보세요.
-    - 트러블 슈팅 과정을 기록해주세요.
-    - 각 기능별 Postman으로 기능 점검 후 캡처
 
 
 ---
 ## 4. ERD 작성 
+
+```mermaid
+erDiagram
+    USER {
+        int id PK "Primary Key"
+        string username "Unique username"
+        string password "User password"
+        string email "Unique email"
+        string name "Full name"
+        string nickname "Nickname"
+        date birthday "Date of birth"
+        string gender "Gender (optional)"
+        string bio "Self-introduction (optional)"
+    }
+
+    PRODUCT {
+        int id PK "Primary Key"
+        string title "Name of the product"
+        string content "Description of the product"
+        string image "Image URL of the product (optional)"
+        datetime created_at "Creation timestamp"
+        datetime updated_at "Last update timestamp"
+        int seller_id FK "Foreign Key referencing USER(id)"
+    }
+
+    FOLLOW {
+        int id PK "Primary Key"
+        int follower_id FK "Foreign Key referencing USER(id)"
+        int followed_id FK "Foreign Key referencing USER(id)"
+    }
+
+    LIKE {
+        int id PK "Primary Key"
+        int user_id FK "Foreign Key referencing USER(id)"
+        int product_id FK "Foreign Key referencing PRODUCT(id)"
+    }
+
+    %% Relationships
+    USER ||--o{ PRODUCT : "registers"
+    USER ||--o{ FOLLOW : "follows"
+    USER ||--o{ LIKE : "likes"
+    PRODUCT ||--o{ LIKE : "is liked by"
+```
+
+---
