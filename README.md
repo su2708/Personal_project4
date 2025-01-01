@@ -1,14 +1,14 @@
-# DRF로 스파르타 마켓 구현해보기기🔥
+# DRF로 스파르타 마켓 구현해보기🔥
 
 ## 1. Goal
 ### 💡주제
 우리를 위한 중고거래 :: 스파르타 마켓
 '스파르타 마켓 백엔드 기능'을 구현하기
 
-### 🎯목표
-- DRF는 RESTful API를 쉽게 만들 수 있도록 도와주는 Django의 확장 패키지입니다!
-    - **REST API**는 클라이언트 -서버 간에 데이터를 JSON, XML 등과 같은 형식으로 주고받기 위해 사용됩니다.
-    - **Serializer**는 Django 모델을 JSON, XML 등으로 변환하거나, 반대로 변환하는 기능을 제공합니다.
+### 프로젝트 목적
+- 사용자 인증과 권한 관리를 통해 안전한 중고거래 플랫폼 제공 
+- 상품 CRUD 기능을 Django DRF를 사용해 RESTful API형태로 구현 
+- 효율적이고 확장 가능한 백엔드 시스템 구축  
 
 
 ---
@@ -16,13 +16,11 @@
 
 ### 설명
 - 각 유저는 자신의 물건을 등록 할 수 있습니다.
-- 지역별 유저는 고려하지 않습니다. 우리는 모두 스파르타 이웃이니까요.
+- 지역별 유저는 고려하지 않습니다.
 - 구매하기 기능은 구현하지 않습니다.
 - 프로젝트 명은 `spartamarket_DRF` 입니다.
-    - 아래의 앱은 필수로 포함하며, 이외에는 자유롭게 구현해 주세요.
-        - `accounts` - 계정 관련 기능
-        - `products` - 상품 관련 기능
-- 모든 API는 RESTful 원칙을 따라야 합니다.
+    - `accounts` - 계정 관련 기능
+    - `products` - 상품 관련 기능
 
 
 ---
@@ -81,45 +79,77 @@
 
 ```mermaid
 erDiagram
-    USER {
-        int id PK "Primary Key"
-        string username "Unique username"
-        string password "User password"
-        string email "Unique email"
-        string name "Full name"
-        string nickname "Nickname"
-        date birthday "Date of birth"
-        string gender "Gender (optional)"
-        string bio "Self-introduction (optional)"
+    User {
+        int id PK
+        string username UNIQUE
+        string email UNIQUE
+        string password
+        string name
+        string nickname
+        date birthday
+        datetime created_at
+        datetime updated_at
+    }
+    
+    Product {
+        int id PK
+        string title
+        string content
+        string image
+        int user_id FK
+        datetime created_at
+        datetime updated_at
     }
 
-    PRODUCT {
-        int id PK "Primary Key"
-        string title "Name of the product"
-        string content "Description of the product"
-        string image "Image URL of the product (optional)"
-        datetime created_at "Creation timestamp"
-        datetime updated_at "Last update timestamp"
-        int seller_id FK "Foreign Key referencing USER(id)"
-    }
+    User ||--o{ Product : "creates"
 
-    FOLLOW {
-        int id PK "Primary Key"
-        int follower_id FK "Foreign Key referencing USER(id)"
-        int followed_id FK "Foreign Key referencing USER(id)"
-    }
-
-    LIKE {
-        int id PK "Primary Key"
-        int user_id FK "Foreign Key referencing USER(id)"
-        int product_id FK "Foreign Key referencing PRODUCT(id)"
-    }
-
-    %% Relationships
-    USER ||--o{ PRODUCT : "registers"
-    USER ||--o{ FOLLOW : "follows"
-    USER ||--o{ LIKE : "likes"
-    PRODUCT ||--o{ LIKE : "is liked by"
 ```
+---
+## 5. TroubleShooting
+#### 1. URL 라우팅 문제로 로그인 함수가 호출되지 않음
+문제: `login` 함수가 호출되지 않아 토큰을 발급받지 못함
+원인: `accounts/urls.py`에서 `path('login', ... )`으로 작성하여 요청 URL에 `/`를 넣지 않았음
+해결방법: `path('login/', ... )`으로 수정하여 문제 해결
+
+#### 2. 회원가입 시 `birthday`필드가 입력 날짜가 아닌 현재 날짜로 저장됨
+문제: 회원 가입을 할 때 입력해준 날짜가 아닌 현재 날짜로 `birthday`필드가 채워짐
+원인: `birthday`의 `auto_now`가 `True`로 설정되어 있었음
+해결방법: `auto_now`를 `False`로 설정하여 문제 해결
+
+#### 3. `username`으로 인증 실패
+문제: `login`에서 사용자 인증을 `username`으로 받고자 했으나 실패
+원인: `User class`의 `USERNAME_FIELD`가 `email`로 설정되어 있었음
+해결방법: `USERNAME_FIELD`를 `username`로 바꿔서 설정
 
 ---
+## 6. Postman으로 각 기능 점검
+#### 1. 회원 가입
+![회원 가입](./postman_img/signup.png)
+
+#### 2. 로그인
+![로그인](./postman_img/login.png)
+
+#### 3. 로그아웃
+![로그아웃](./postman_img/logout.png)
+
+#### 4. 로그인 상태에서 프로필 조회
+![로그인 프로필 조회](./postman_img/profile_login.png)
+
+#### 5. 로그아웃 상태에서 프로필 조회
+![로그아웃 프로필 조회](./postman_img/profile_logout.png)
+
+#### 6. 상품 등록
+![상품 등록](./postman_img/상품등록.png)
+
+#### 7. 상품 상세 조회
+![상품 상세 조회](./postman_img/상품%20상세%20조회.png)
+
+#### 8. 상품 목록 조회 
+![상품 목록 조회](./postman_img/상품%20목록%20조회.png)
+
+#### 9. 상품 수정
+![상품 수정](./postman_img/상품%20수정.png)
+
+#### 10. 상품 삭제
+![상품 삭제](./postman_img/상품%20삭제.png)
+
