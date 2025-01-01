@@ -1,4 +1,3 @@
-#accounts/serializers.py
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -33,13 +32,24 @@ class SignupSerializer(serializers.ModelSerializer):
 #         fields = ['email', 'username', 'profile_image']  # 반환할 필드
 
 class UserProfileSerializer(serializers.ModelSerializer):    
+    profile_image = serializers.SerializerMethodField()  # 커스텀 필드로 처리 
+    
     class Meta:
         model = User
-        fields = ['email', 'username', 'birthday']  # 반환할 필드
+        fields = ['email', 'username', 'profile_image', 'birthday']  # 반환할 필드
+    
+    def get_profile_image(self, obj):
+        # Serializer context에서 request 가져오기
+        request = self.context.get('request')  
+        
+        if obj.profile_image:
+            return request.build_absolute_uri(obj.profile_image.url)
+        
+        return None
 
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('username', 'birthday')  # 수정 가능한 필드
+        fields = ('username','profile_image', 'birthday')  # 수정 가능한 필드

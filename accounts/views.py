@@ -26,11 +26,11 @@ def signup(request):
 @authentication_classes([])      # 전역 인증 설정 무시
 @permission_classes([AllowAny])  # 전역 IsAuthenticated 설정 무시
 def login(request):
-    email = request.POST.get('email')
+    username = request.POST.get('username')
     password = request.POST.get('password')
-
+    
     # 사용자 인증
-    user = authenticate(request, email=email, password=password)
+    user = authenticate(request, username=username, password=password)
     if user is not None:
         # JWT 토큰 생성
         refresh = RefreshToken.for_user(user)
@@ -42,7 +42,25 @@ def login(request):
     else:
         return JsonResponse({'error': '이메일 또는 비밀번호가 올바르지 않습니다.'}, status=400)
 
+@api_view(['POST'])
+@authentication_classes([])      # 전역 인증 설정 무시
+@permission_classes([AllowAny])  # 전역 IsAuthenticated 설정 무시
+def logout(request):
+    print('---')
+    try:
+        refresh_token = request.data.get("refresh")
+        print(refresh_token)
+        token = RefreshToken(refresh_token)
+        print(token)
+        token.blacklist()
+        print('---')
+        return Response({"message": "로그아웃 성공"})
+    except Exception:
+        return Response({"error": "로그아웃 실패"}, status=status.HTTP_400_BAD_REQUEST)
+        
+
 @api_view(['GET', 'PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
 def profile(request, username):
     user = request.user  # JWT 인증을 통해 얻은 현재 사용자
     

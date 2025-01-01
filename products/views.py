@@ -59,10 +59,17 @@ class ProductDetail(APIView):
     def put(self, request, productId):
         """상품 수정"""
         product = self.get_object(productId)
-        serializer = ProductDetailSerializer(product)
+        serializer = ProductDetailSerializer(
+            instance=product,
+            data=request.data,
+            partial=True
+        )
+        
         if serializer.is_valid(raise_exception=True):
             serializer.save()
             return Response(serializer.data)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def delete(self, request, productId):
         """상품 삭제"""
